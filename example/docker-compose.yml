@@ -1,0 +1,23 @@
+services:
+  frontend:
+    container_name: anicetus-example-frontend
+    build: https://github.com/hatoo/oha.git
+
+    # 2 queries per second means 120 queries per minute, during 10 minutes
+    command: -q 2 -z 10m http://anicetus
+
+  anicetus:
+    container_name: anicetus-example-anicetus
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment:
+      ANICETUS_LOG_LEVEL: "INFO"
+      ANICETUS_BACKEND_ADDRESS: "http://backend:80"
+      ANICETUS_DETECTOR_REQUESTS_PER_MINUTE: "60"
+
+  backend:
+    container_name: anicetus-example-backend
+    build:
+      context: backend
+      dockerfile: Dockerfile
