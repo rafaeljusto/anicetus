@@ -17,6 +17,8 @@ Out of the box, a web server (`anicetus-http`) is provided as a micro-service
 for your network, but this library can be used in any Go project to plug-in with
 an existing solution.
 
+[![Anicetus Video](https://img.youtube.com/vi/vInKlTQMKBc/0.jpg)](https://www.youtube.com/watch?v=vInKlTQMKBc)
+
 ## Design
 
 ```mermaid
