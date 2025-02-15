@@ -6,10 +6,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/rafaeljusto/anicetus"
-	"github.com/rafaeljusto/anicetus/detector"
-	"github.com/rafaeljusto/anicetus/fingerprint"
-	"github.com/rafaeljusto/anicetus/storage"
+	"github.com/rafaeljusto/anicetus/v2"
+	"github.com/rafaeljusto/anicetus/v2/detector"
+	"github.com/rafaeljusto/anicetus/v2/fingerprint"
+	"github.com/rafaeljusto/anicetus/v2/storage"
 )
 
 // Resources stores the resources for the web server.
@@ -27,9 +27,9 @@ func NewResources(config *Config) *Resources {
 		})),
 		Anicetus: anicetus.NewAnicetus[fingerprint.HTTPRequest](
 			detector.NewTokenBucketInMemory(
-				detector.WithLimitersBurst(config.Detector.RequestsPerMinute),
-				detector.WithLimitersInterval(time.Minute),
-				detector.WithCoolDownInterval(config.Detector.CoolDown),
+				detector.TokenBucketWithLimitersBurst(config.Detector.RequestsPerMinute),
+				detector.TokenBucketWithLimitersInterval(time.Minute),
+				detector.TokenBucketWithCoolDownInterval(config.Detector.CoolDown),
 			),
 			storage.NewInMemory(),
 		),

@@ -1,5 +1,7 @@
-module github.com/rafaeljusto/anicetus
+module github.com/rafaeljusto/anicetus/v2
 
-go 1.23.0
+go 1.24
 
-require golang.org/x/time v0.10.0
+toolchain go1.24.0
+
+require github.com/gomodule/redigo v1.9.2

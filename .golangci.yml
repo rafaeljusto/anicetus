@@ -1,9 +1,16 @@
+# Options for analysis running.
 run:
-  deadline: 600s
+  # Timeout for analysis, e.g. 30s, 5m.
+  # If the value is lower or equal to 0, the timeout is disabled.
+  timeout: 5m
+  # Include test files or not.
   tests: true
 
 linters:
+  # Disable all linters.
   disable-all: true
+
+  # Enable specific linter
   enable:
     - errcheck
     - gocritic
@@ -22,7 +29,12 @@ linters:
 
 linters-settings:
   lll:
+    # Max line length, lines longer will be reported. '\t' is counted as 1
+    # character by default, and can be changed with the tab-width option.
     line-length: 120
 
 issues:
+  # Independently of option `exclude` we use default exclude patterns, it can be
+  # disabled by this option. To list all excluded by default patterns execute
+  # `golangci-lint run --help`.
   exclude-use-default: false

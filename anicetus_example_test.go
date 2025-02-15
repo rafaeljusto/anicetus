@@ -1,15 +1,16 @@
 package anicetus_test
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"os"
 	"time"
 
-	"github.com/rafaeljusto/anicetus"
-	"github.com/rafaeljusto/anicetus/detector"
-	"github.com/rafaeljusto/anicetus/storage"
+	"github.com/rafaeljusto/anicetus/v2"
+	"github.com/rafaeljusto/anicetus/v2/detector"
+	"github.com/rafaeljusto/anicetus/v2/storage"
 )
 
 // Request represents an incoming request.
@@ -29,10 +30,12 @@ func (r Request) Fingerprint() anicetus.Fingerprint {
 }
 
 func ExampleAnicetus_Evaluate() {
+	ctx := context.Background()
+
 	detector := detector.NewTokenBucketInMemory(
-		detector.WithLimitersBurst(1),
-		detector.WithLimitersInterval(time.Minute),
-		detector.WithCoolDownInterval(10*time.Minute),
+		detector.TokenBucketWithLimitersBurst(1),
+		detector.TokenBucketWithLimitersInterval(time.Minute),
+		detector.TokenBucketWithCoolDownInterval(10*time.Minute),
 	)
 
 	gatekeeperStorage := storage.NewInMemory()
@@ -40,7 +43,7 @@ func ExampleAnicetus_Evaluate() {
 	anicetus := anicetus.NewAnicetus[Request](detector, gatekeeperStorage)
 
 	evaluate := func(req Request) {
-		status, err := anicetus.Evaluate(req)
+		status, err := anicetus.Evaluate(ctx, req)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to evaluate request: %v", err)
 		}
@@ -53,7 +56,7 @@ func ExampleAnicetus_Evaluate() {
 	evaluate(req)
 	evaluate(req)
 
-	if err := anicetus.RequestDone(req); err != nil {
+	if err := anicetus.RequestDone(ctx, req); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to mark request as done: %v", err)
 	}
 

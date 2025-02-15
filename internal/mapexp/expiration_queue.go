@@ -39,6 +39,18 @@ func (e *expirationQueue[K]) add(key K) {
 	})
 }
 
+func (e *expirationQueue[K]) renew(key K) {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+
+	for i, item := range e.items {
+		if item.key == key {
+			e.items[i].expiration = time.Now().Add(e.ttl)
+			break
+		}
+	}
+}
+
 func (e *expirationQueue[K]) purge() []K {
 	var expiredKeys []K
 
