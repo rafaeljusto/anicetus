@@ -1,16 +1,49 @@
-package storage_test
+//go:build integration_tests
+// +build integration_tests
+
+package redigo_test
 
 import (
+	"context"
+	"os"
 	"testing"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/rafaeljusto/anicetus/v2"
-	"github.com/rafaeljusto/anicetus/v2/storage"
+	"github.com/rafaeljusto/anicetus/v2/storage/redigo"
 )
 
-func TestInMemory_lifecycle(t *testing.T) {
+const defaultRedisAddress = "localhost:6379"
+
+func TestRedis_lifecycle(t *testing.T) {
 	fingerprint := anicetus.Fingerprint("test")
 
-	storage := storage.NewInMemory()
+	redisAddress := defaultRedisAddress
+	if e := os.Getenv("REDIS_ADDRESS"); e != "" {
+		redisAddress = e
+	}
+
+	redisPool := &redis.Pool{
+		DialContext: func(ctx context.Context) (redis.Conn, error) {
+			return redis.DialContext(ctx, "tcp", redisAddress)
+		},
+	}
+
+	redisConn, err := redisPool.GetContext(t.Context())
+	if err != nil {
+		t.Fatalf("failed to get redis connection: %v", err)
+	}
+	defer func() {
+		if err := redisConn.Close(); err != nil {
+			t.Errorf("failed to close redis connection: %v", err)
+		}
+	}()
+	_, err = redisConn.Do("FLUSHDB")
+	if err != nil {
+		t.Fatalf("failed to flush redis database: %v", err)
+	}
+
+	storage := redigo.NewRedis(redisPool)
 	if ok, err := storage.Exists(t.Context(), fingerprint); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else if ok {

@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/rafaeljusto/anicetus"
-	"github.com/rafaeljusto/anicetus/fingerprint"
+	"github.com/rafaeljusto/anicetus/v2"
+	"github.com/rafaeljusto/anicetus/v2/fingerprint"
 )
 
 // RegisterHandlers registers the handlers for the web server.
@@ -35,7 +35,7 @@ func anicetusHandler(config *Config, resources *Resources) http.HandlerFunc {
 			fingerprint.WithHTTPRequestCookies(config.Fingerprint.Cookies...),
 		)
 
-		gatekeeperStatus, err := resources.Anicetus.Evaluate(fingerprint)
+		gatekeeperStatus, err := resources.Anicetus.Evaluate(r.Context(), fingerprint)
 		if err != nil {
 			httpLogger.Error("failed to analyze fingerprint",
 				slog.String("error", err.Error()),
@@ -55,7 +55,7 @@ func anicetusHandler(config *Config, resources *Resources) http.HandlerFunc {
 			err := forwardRequest(w, r, config, resources,
 				forwardRequestWithAnicetus(gatekeeperStatus, fingerprint.Fingerprint()),
 				forwardRequestWithResponseHandler(func(*http.Response) error {
-					return resources.Anicetus.RequestDone(fingerprint)
+					return resources.Anicetus.RequestDone(r.Context(), fingerprint)
 				}),
 			)
 			if err != nil {
@@ -64,7 +64,7 @@ func anicetusHandler(config *Config, resources *Resources) http.HandlerFunc {
 				)
 				w.WriteHeader(http.StatusInternalServerError)
 
-				if err := resources.Anicetus.Cleanup(fingerprint); err != nil {
+				if err := resources.Anicetus.Cleanup(r.Context(), fingerprint); err != nil {
 					httpLogger.Error("failed to remove fingerprint",
 						slog.String("error", err.Error()),
 					)

@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/rafaeljusto/anicetus"
+	"github.com/rafaeljusto/anicetus/v2"
 )
 
 var _ anicetus.Fingerprinter = &HTTPRequest{}

@@ -1,6 +1,7 @@
 package anicetus
 
 import (
+	"context"
 	"fmt"
 )
 
@@ -22,33 +23,37 @@ func NewAnicetus[F Fingerprinter](detector Detector, gatekeeperStorage Gatekeepe
 
 // Evaluate checks if the request is a thundering herd and if it is, it will
 // gatekeep it.
-func (t Anicetus[F]) Evaluate(f F) (Status, error) {
+func (t Anicetus[F]) Evaluate(ctx context.Context, f F) (Status, error) {
 	fingerprint := f.Fingerprint()
 
-	cooldown, err := t.detector.IsCoolDown(fingerprint)
+	cooldown, err := t.detector.IsCoolDown(ctx, fingerprint)
 	if err != nil {
 		return StatusFailed, fmt.Errorf("failed to check if fingerprint is in cooldown: %w", err)
 	} else if cooldown {
 		return StatusOpenGates, nil
 	}
 
-	thunderingHerd, err := t.detector.IsThunderingHerd(fingerprint)
+	thunderingHerd, err := t.detector.IsThunderingHerd(ctx, fingerprint)
 	if err != nil {
 		return StatusFailed, fmt.Errorf("failed to check if fingerprint is a thundering herd: %w", err)
 	} else if !thunderingHerd {
+		// if the thundering herd is not detected, we can open the gates
+		if err := t.gatekeeper.Remove(ctx, fingerprint); err != nil {
+			return StatusFailed, fmt.Errorf("failed to remove fingerprint: %w", err)
+		}
 		return StatusOpenGates, nil
 	}
 
-	return t.gatekeeper.analyze(fingerprint)
+	return t.gatekeeper.analyze(ctx, fingerprint)
 }
 
 // RequestDone will mark the request as done. This should be called after the
 // request is processed.
-func (t Anicetus[F]) RequestDone(f F) error {
-	if err := t.gatekeeper.Store(f.Fingerprint(), true); err != nil {
+func (t Anicetus[F]) RequestDone(ctx context.Context, f F) error {
+	if err := t.gatekeeper.Store(ctx, f.Fingerprint(), true); err != nil {
 		return fmt.Errorf("failed to store fingerprint: %w", err)
 	}
-	if err := t.detector.CoolDown(f.Fingerprint()); err != nil {
+	if err := t.detector.CoolDown(ctx, f.Fingerprint()); err != nil {
 		return fmt.Errorf("failed to cooldown fingerprint: %w", err)
 	}
 	return nil
@@ -56,8 +61,8 @@ func (t Anicetus[F]) RequestDone(f F) error {
 
 // Cleanup will remove the fingerprint from the storage. This should be called
 // in case there is some error while processing the request.
-func (t Anicetus[F]) Cleanup(f F) error {
-	if err := t.gatekeeper.Remove(f.Fingerprint()); err != nil {
+func (t Anicetus[F]) Cleanup(ctx context.Context, f F) error {
+	if err := t.gatekeeper.Remove(ctx, f.Fingerprint()); err != nil {
 		return fmt.Errorf("failed to remove fingerprint: %w", err)
 	}
 	return nil
@@ -65,9 +70,9 @@ func (t Anicetus[F]) Cleanup(f F) error {
 
 // Detector is the component that will be used to detect thundering herd.
 type Detector interface {
-	CoolDown(Fingerprint) error
-	IsCoolDown(Fingerprint) (bool, error)
-	IsThunderingHerd(Fingerprint) (bool, error)
+	CoolDown(context.Context, Fingerprint) error
+	IsCoolDown(context.Context, Fingerprint) (bool, error)
+	IsThunderingHerd(context.Context, Fingerprint) (bool, error)
 }
 
 // Fingerprint is the unique identifier for the request.

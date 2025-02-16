@@ -1,9 +1,10 @@
 package anicetus_test
 
 import (
+	"context"
 	"testing"
 
-	"github.com/rafaeljusto/anicetus"
+	"github.com/rafaeljusto/anicetus/v2"
 )
 
 func TestAnicetus_Evaluate(t *testing.T) {
@@ -73,7 +74,7 @@ func TestAnicetus_Evaluate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			th := anicetus.NewAnicetus[fakeFingerprinter](tt.detector, tt.gatekeeperStorage)
 
-			status, err := th.Evaluate(fakeFingerprinter{})
+			status, err := th.Evaluate(t.Context(), fakeFingerprinter{})
 			if err != nil {
 				t.Errorf("unexpected error '%v'", err)
 			}
@@ -91,7 +92,7 @@ func TestAnicetus_Evaluate_fullCycle(t *testing.T) {
 
 	var fingerprinter fakeFingerprinter
 
-	status, err := th.Evaluate(fingerprinter)
+	status, err := th.Evaluate(t.Context(), fingerprinter)
 	if err != nil {
 		t.Fatalf("unexpected error '%v'", err)
 	}
@@ -99,11 +100,11 @@ func TestAnicetus_Evaluate_fullCycle(t *testing.T) {
 		t.Fatalf("unexpected status '%v', want '%v'", status, anicetus.StatusProcess)
 	}
 
-	if err := th.RequestDone(fingerprinter); err != nil {
+	if err := th.RequestDone(t.Context(), fingerprinter); err != nil {
 		t.Fatalf("unexpected error '%v'", err)
 	}
 
-	status, err = th.Evaluate(fingerprinter)
+	status, err = th.Evaluate(t.Context(), fingerprinter)
 	if err != nil {
 		t.Fatalf("unexpected error '%v'", err)
 	}
@@ -111,11 +112,11 @@ func TestAnicetus_Evaluate_fullCycle(t *testing.T) {
 		t.Fatalf("unexpected status '%v', want '%v'", status, anicetus.StatusOpenGates)
 	}
 
-	if err := th.Cleanup(fingerprinter); err != nil {
+	if err := th.Cleanup(t.Context(), fingerprinter); err != nil {
 		t.Fatalf("unexpected error '%v'", err)
 	}
 
-	status, err = th.Evaluate(fingerprinter)
+	status, err = th.Evaluate(t.Context(), fingerprinter)
 	if err != nil {
 		t.Fatalf("unexpected error '%v'", err)
 	}
@@ -141,15 +142,15 @@ type fakeDetector struct {
 	anicetus bool
 }
 
-func (d fakeDetector) IsCoolDown(anicetus.Fingerprint) (bool, error) {
+func (d fakeDetector) IsCoolDown(context.Context, anicetus.Fingerprint) (bool, error) {
 	return d.cooldown, nil
 }
 
-func (d fakeDetector) CoolDown(anicetus.Fingerprint) error {
+func (d fakeDetector) CoolDown(context.Context, anicetus.Fingerprint) error {
 	return nil
 }
 
-func (d fakeDetector) IsThunderingHerd(anicetus.Fingerprint) (bool, error) {
+func (d fakeDetector) IsThunderingHerd(context.Context, anicetus.Fingerprint) (bool, error) {
 	return d.anicetus, nil
 }
 
@@ -159,21 +160,21 @@ type fakeGatekeeperStorage struct {
 	processed bool
 }
 
-func (gs fakeGatekeeperStorage) Exists(anicetus.Fingerprint) (bool, error) {
+func (gs fakeGatekeeperStorage) Exists(context.Context, anicetus.Fingerprint) (bool, error) {
 	return gs.exists, nil
 }
 
-func (gs fakeGatekeeperStorage) Processed(anicetus.Fingerprint) (bool, error) {
+func (gs fakeGatekeeperStorage) Processed(context.Context, anicetus.Fingerprint) (bool, error) {
 	return gs.processed, nil
 }
 
-func (gs *fakeGatekeeperStorage) Store(_ anicetus.Fingerprint, processed bool) error {
+func (gs *fakeGatekeeperStorage) Store(_ context.Context, _ anicetus.Fingerprint, processed bool) error {
 	gs.exists = true
 	gs.processed = processed
 	return nil
 }
 
-func (gs *fakeGatekeeperStorage) Remove(anicetus.Fingerprint) error {
+func (gs *fakeGatekeeperStorage) Remove(context.Context, anicetus.Fingerprint) error {
 	gs.exists = false
 	gs.processed = false
 	return nil

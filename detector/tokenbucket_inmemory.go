@@ -1,48 +1,15 @@
 package detector
 
 import (
+	"context"
 	"time"
 
-	"github.com/rafaeljusto/anicetus"
-	"github.com/rafaeljusto/anicetus/internal/mapexp"
-	"golang.org/x/time/rate"
+	"github.com/rafaeljusto/anicetus/v2"
+	"github.com/rafaeljusto/anicetus/v2/internal/mapexp"
+	"github.com/rafaeljusto/anicetus/v2/internal/rate"
 )
 
 var _ anicetus.Detector = &TokenBucketInMemory{}
-
-// TokenBucketInMemoryOptions represents the options that can be used to
-// configure a TokenBucketInMemory.
-type TokenBucketInMemoryOptions struct {
-	coolDownInterval time.Duration
-	limitersBurst    int64
-	limitersInterval time.Duration
-}
-
-// TokenBucketInMemoryOption is a helper function to configure the
-// TokenBucketInMemory.
-type TokenBucketInMemoryOption func(*TokenBucketInMemoryOptions)
-
-// WithCoolDownInterval sets the cooldown interval for the TokenBucketInMemory.
-func WithCoolDownInterval(interval time.Duration) TokenBucketInMemoryOption {
-	return func(o *TokenBucketInMemoryOptions) {
-		o.coolDownInterval = interval
-	}
-}
-
-// WithLimitersBurst sets the burst for the limiters in the TokenBucketInMemory.
-func WithLimitersBurst(burst int64) TokenBucketInMemoryOption {
-	return func(o *TokenBucketInMemoryOptions) {
-		o.limitersBurst = burst
-	}
-}
-
-// WithLimitersInterval sets the interval for the limiters in the
-// TokenBucketInMemory.
-func WithLimitersInterval(interval time.Duration) TokenBucketInMemoryOption {
-	return func(o *TokenBucketInMemoryOptions) {
-		o.limitersInterval = interval
-	}
-}
 
 // TokenBucketInMemory is a token bucket detector strategy that stores the state
 // in memory.
@@ -54,42 +21,40 @@ type TokenBucketInMemory struct {
 }
 
 // NewTokenBucketInMemory creates a new token bucket detector strategy.
-func NewTokenBucketInMemory(options ...TokenBucketInMemoryOption) *TokenBucketInMemory {
-	o := TokenBucketInMemoryOptions{
-		coolDownInterval: 5 * time.Minute,
-		limitersBurst:    1000,
-		limitersInterval: 1 * time.Minute,
-	}
+func NewTokenBucketInMemory(options ...TokenBucketOption) *TokenBucketInMemory {
+	o := NewTokenBucketOptions()
 	for _, opt := range options {
-		opt(&o)
+		opt(o)
 	}
 
+	fullBucketPeriod := o.LimitersInterval() * time.Duration(o.limitersBurst)
+
 	return &TokenBucketInMemory{
-		cooldowns:        mapexp.New[anicetus.Fingerprint, bool](o.coolDownInterval),
-		limiters:         mapexp.New[anicetus.Fingerprint, *rate.Limiter](o.limitersInterval),
-		limitersBurst:    o.limitersBurst,
-		limitersInterval: o.limitersInterval,
+		cooldowns:        mapexp.New[anicetus.Fingerprint, bool](o.CoolDownInterval()),
+		limiters:         mapexp.New[anicetus.Fingerprint, *rate.Limiter](fullBucketPeriod),
+		limitersBurst:    o.LimitersBurst(),
+		limitersInterval: o.LimitersInterval(),
 	}
 }
 
 // CoolDown will cool down the fingerprint.
-func (d *TokenBucketInMemory) CoolDown(fingerprint anicetus.Fingerprint) error {
-	d.cooldowns.Set(fingerprint, true)
+func (t *TokenBucketInMemory) CoolDown(_ context.Context, fingerprint anicetus.Fingerprint) error {
+	t.cooldowns.Set(fingerprint, true)
 	return nil
 }
 
 // IsCoolDown checks if the fingerprint is in cooldown.
-func (d *TokenBucketInMemory) IsCoolDown(fingerprint anicetus.Fingerprint) (bool, error) {
-	cooldown, ok := d.cooldowns.Get(fingerprint)
+func (t *TokenBucketInMemory) IsCoolDown(_ context.Context, fingerprint anicetus.Fingerprint) (bool, error) {
+	cooldown, ok := t.cooldowns.Get(fingerprint)
 	return cooldown && ok, nil
 }
 
 // IsThunderingHerd checks if the fingerprint is a thundering herd.
-func (d *TokenBucketInMemory) IsThunderingHerd(fingerprint anicetus.Fingerprint) (bool, error) {
-	limiter, ok := d.limiters.Get(fingerprint)
+func (t *TokenBucketInMemory) IsThunderingHerd(_ context.Context, fingerprint anicetus.Fingerprint) (bool, error) {
+	limiter, ok := t.limiters.Get(fingerprint)
 	if !ok {
-		limiter = rate.NewLimiter(rate.Every(d.limitersInterval), int(d.limitersBurst))
-		d.limiters.Set(fingerprint, limiter)
+		limiter = rate.NewLimiter(rate.Every(t.limitersInterval), int(t.limitersBurst))
+		t.limiters.Set(fingerprint, limiter)
 	}
 	return !limiter.Allow(), nil
 }

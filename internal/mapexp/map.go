@@ -38,6 +38,8 @@ func (m *Map[K, V]) Get(key K) (V, bool) {
 	m.itemsMutex.RLock()
 	value, ok := m.items[key]
 	m.itemsMutex.RUnlock()
+
+	m.expirationQueue.renew(key)
 	return value, ok
 }
 

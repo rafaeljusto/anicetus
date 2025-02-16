@@ -67,10 +67,11 @@ target specific users or not.
 
 Once the fingerprint is generated, the detector will check if there are other
 requests with the same fingerprint. Different algorithms can be used to detect a
-thundeting herd, and this library provides the
-[token bucket](https://en.wikipedia.org/wiki/Token_bucket) out-of-the-box. When
-using the token bucket algorithm the detector needs to know how many same
-fingerprint occurences are allowed in a time window.
+thundeting herd, and this library provides the [token
+bucket](https://en.wikipedia.org/wiki/Token_bucket) out-of-the-box (with a
+penalty strategy; bucket is drained while in thundering herd). When using the
+token bucket algorithm the detector needs to know how many same fingerprint
+occurences are allowed in a time window.
 
 After the thundering herd is handled, the detector will stop analysing the
 requests for a while (cooldown period). This is to avoid the thundering herd to
@@ -101,9 +102,9 @@ import (
   "net/http"
   "time"
 
-  "github.com/rafaeljusto/anicetus"
-  "github.com/rafaeljusto/anicetus/detector"
-  "github.com/rafaeljusto/anicetus/storage"
+  "github.com/rafaeljusto/anicetus/v2"
+  "github.com/rafaeljusto/anicetus/v2/detector"
+  "github.com/rafaeljusto/anicetus/v2/storage"
 )
 
 func main() {
@@ -121,7 +122,7 @@ func main() {
 
   // For each request in your application (here we simulate an HTTP request)
   requestFingerprint := fingerprint.NewHTTPRequest(&http.Request{})
-  status, err := anicetus.Evaluate(requestFingerprint)
+  status, err := anicetus.Evaluate(context.Background(), requestFingerprint)
   if err != nil {
     // handle error
   }
@@ -137,14 +138,14 @@ func main() {
     // something went wrong while evaluating the request
 
     // you can optionally cleanup the request fingerprint state
-    if err := aniceuts.Cleanup(requestFingerprint); err != nil {
+    if err := aniceuts.Cleanup(context.Background(), requestFingerprint); err != nil {
       // handle error
     }
   }
 
   // the single request needs to inform the gatekeeper that it finished
   // processing the request
-  if err := anicetus.RequestDone(requestFingerprint); err != nil {
+  if err := anicetus.RequestDone(context.Background(), requestFingerprint); err != nil {
     // handle error
   }
 }
@@ -176,5 +177,5 @@ Mount Olympus. It's a metaphor for the protector of the backend application. ðŸ˜
 fingerprints in this library?**
 
 A: At first we are trying to minimize the number of Go dependencies to make this
-library lightweight. We may in the near future add support for Redis storages,
-creating dependencies to other third-party libraries.
+library lightweight. We already added support for Redis detector and storage,
+and may add more options in the future.
