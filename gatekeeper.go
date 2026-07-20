@@ -20,25 +20,27 @@ func NewGatekeeper(storage GatekeeperStorage) *Gatekeeper {
 
 // analyze checks if the fingerprint is valid to be processed.
 func (g Gatekeeper) analyze(ctx context.Context, fingerprint Fingerprint) (Status, error) {
-	if exists, err := g.storage.Exists(ctx, fingerprint); err != nil {
-		return StatusFailed, fmt.Errorf("failed to check if fingerprint exists: %w", err)
-
-	} else if exists {
-		if processed, err := g.storage.Processed(ctx, fingerprint); err != nil {
-			return StatusFailed, fmt.Errorf("failed to get fingerprint processed flag: %w", err)
-
-		} else if processed {
-			return StatusOpenGates, nil
-		}
-
-		return StatusWait, nil
+	// Add is the atomic election: exactly one concurrent request with the same
+	// fingerprint gets elected == true and is allowed to reach the backend.
+	elected, err := g.storage.Add(ctx, fingerprint)
+	if err != nil {
+		return StatusFailed, fmt.Errorf("failed to elect fingerprint: %w", err)
+	}
+	if elected {
+		return StatusProcess, nil
 	}
 
-	if err := g.storage.Store(ctx, fingerprint, false); err != nil {
-		return StatusFailed, fmt.Errorf("failed to store fingerprint: %w", err)
+	// Another request was already elected. Let this one through only once the
+	// elected request has populated the backend cache, otherwise make it wait.
+	processed, err := g.storage.Processed(ctx, fingerprint)
+	if err != nil {
+		return StatusFailed, fmt.Errorf("failed to get fingerprint processed flag: %w", err)
+	}
+	if processed {
+		return StatusOpenGates, nil
 	}
 
-	return StatusProcess, nil
+	return StatusWait, nil
 }
 
 // Store stores the fingerprint in the storage. This should be called after the
@@ -55,11 +57,22 @@ func (g Gatekeeper) Remove(ctx context.Context, fingerprint Fingerprint) error {
 
 // GatekeeperStorage stores the fingerprints.
 type GatekeeperStorage interface {
-	// Exists checks if the fingerprint exists in the storage.
-	Exists(ctx context.Context, fingerprint Fingerprint) (bool, error)
+	// Add atomically records the fingerprint as in-flight (stored with the
+	// processed flag set to false) if it is not already present, returning true
+	// only when this call created the entry. For a group of concurrent requests
+	// with the same fingerprint, exactly one caller MUST receive true: that
+	// request is the one elected to reach the backend. This method is the
+	// election primitive and therefore MUST be atomic (check-and-set), otherwise
+	// a thundering herd can elect more than one request.
+	//
+	// The entry created by Add MUST expire after an implementation-defined lease.
+	// This guarantees that if the elected request dies before calling Store or
+	// Remove, the fingerprint is eventually released for a new election instead
+	// of blocking every subsequent request forever.
+	Add(ctx context.Context, fingerprint Fingerprint) (bool, error)
 	// Processed checks if the fingerprint has been processed.
 	Processed(ctx context.Context, fingerprint Fingerprint) (bool, error)
-	// Store stores the fingerprint in the storage.
+	// Store stores the fingerprint in the storage with the given processed flag.
 	Store(ctx context.Context, fingerprint Fingerprint, processed bool) error
 	// Remove removes the fingerprint from the storage. It MUST not return an
 	// error if the fingerprint doesn't exist.

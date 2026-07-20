@@ -20,7 +20,7 @@ func TestAnicetus_Evaluate(t *testing.T) {
 			anicetus: false,
 		},
 		gatekeeperStorage: &fakeGatekeeperStorage{
-			exists:    false,
+			present:   false,
 			processed: false,
 		},
 		want: anicetus.StatusOpenGates,
@@ -31,7 +31,7 @@ func TestAnicetus_Evaluate(t *testing.T) {
 			anicetus: true,
 		},
 		gatekeeperStorage: &fakeGatekeeperStorage{
-			exists:    false,
+			present:   false,
 			processed: false,
 		},
 		want: anicetus.StatusProcess,
@@ -42,7 +42,7 @@ func TestAnicetus_Evaluate(t *testing.T) {
 			anicetus: true,
 		},
 		gatekeeperStorage: &fakeGatekeeperStorage{
-			exists:    true,
+			present:   true,
 			processed: false,
 		},
 		want: anicetus.StatusWait,
@@ -53,7 +53,7 @@ func TestAnicetus_Evaluate(t *testing.T) {
 			anicetus: true,
 		},
 		gatekeeperStorage: &fakeGatekeeperStorage{
-			exists:    true,
+			present:   true,
 			processed: true,
 		},
 		want: anicetus.StatusOpenGates,
@@ -64,7 +64,7 @@ func TestAnicetus_Evaluate(t *testing.T) {
 			anicetus: true,
 		},
 		gatekeeperStorage: &fakeGatekeeperStorage{
-			exists:    false,
+			present:   false,
 			processed: false,
 		},
 		want: anicetus.StatusOpenGates,
@@ -156,12 +156,16 @@ func (d fakeDetector) IsThunderingHerd(context.Context, anicetus.Fingerprint) (b
 
 // fakeGatekeeperStorage is a fake implementation of GatekeeperStorage.
 type fakeGatekeeperStorage struct {
-	exists    bool
+	present   bool
 	processed bool
 }
 
-func (gs fakeGatekeeperStorage) Exists(context.Context, anicetus.Fingerprint) (bool, error) {
-	return gs.exists, nil
+func (gs *fakeGatekeeperStorage) Add(context.Context, anicetus.Fingerprint) (bool, error) {
+	if gs.present {
+		return false, nil
+	}
+	gs.present = true
+	return true, nil
 }
 
 func (gs fakeGatekeeperStorage) Processed(context.Context, anicetus.Fingerprint) (bool, error) {
@@ -169,13 +173,13 @@ func (gs fakeGatekeeperStorage) Processed(context.Context, anicetus.Fingerprint)
 }
 
 func (gs *fakeGatekeeperStorage) Store(_ context.Context, _ anicetus.Fingerprint, processed bool) error {
-	gs.exists = true
+	gs.present = true
 	gs.processed = processed
 	return nil
 }
 
 func (gs *fakeGatekeeperStorage) Remove(context.Context, anicetus.Fingerprint) error {
-	gs.exists = false
+	gs.present = false
 	gs.processed = false
 	return nil
 }

@@ -7,16 +7,18 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/rafaeljusto/anicetus/v2"
+	"github.com/rafaeljusto/anicetus/v2/storage"
 	"github.com/rafaeljusto/anicetus/v2/storage/redigo"
 )
 
 const defaultRedisAddress = "localhost:6379"
 
-func TestRedis_lifecycle(t *testing.T) {
-	fingerprint := anicetus.Fingerprint("test")
+func newRedisPool(t *testing.T) *redis.Pool {
+	t.Helper()
 
 	redisAddress := defaultRedisAddress
 	if e := os.Getenv("REDIS_ADDRESS"); e != "" {
@@ -38,57 +40,89 @@ func TestRedis_lifecycle(t *testing.T) {
 			t.Errorf("failed to close redis connection: %v", err)
 		}
 	}()
-	_, err = redisConn.Do("FLUSHDB")
-	if err != nil {
+	if _, err := redisConn.Do("FLUSHDB"); err != nil {
 		t.Fatalf("failed to flush redis database: %v", err)
 	}
 
-	storage := redigo.NewRedis(redisPool)
-	if ok, err := storage.Exists(t.Context(), fingerprint); err != nil {
+	return redisPool
+}
+
+func TestRedis_lifecycle(t *testing.T) {
+	fingerprint := anicetus.Fingerprint("test")
+
+	s := redigo.NewRedis(newRedisPool(t))
+
+	if elected, err := s.Add(t.Context(), fingerprint); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	} else if !elected {
+		t.Error("first Add should elect the fingerprint")
+	}
+
+	if elected, err := s.Add(t.Context(), fingerprint); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	} else if elected {
+		t.Error("second Add should not elect the fingerprint")
+	}
+
+	if ok, err := s.Processed(t.Context(), fingerprint); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else if ok {
-		t.Error("unexpected fingerprint exists")
+		t.Error("fingerprint should not be processed yet")
 	}
 
-	if ok, err := storage.Processed(t.Context(), fingerprint); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	} else if ok {
-		t.Error("unexpected fingerprint processed")
-	}
-
-	if err := storage.Store(t.Context(), fingerprint, false); err != nil {
+	if err := s.Store(t.Context(), fingerprint, true); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if ok, err := storage.Exists(t.Context(), fingerprint); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	} else if !ok {
-		t.Error("fingerprint should exists")
-	}
-
-	if ok, err := storage.Processed(t.Context(), fingerprint); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	} else if ok {
-		t.Error("fingerprint should not be processed")
-	}
-
-	if err := storage.Store(t.Context(), fingerprint, true); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if ok, err := storage.Processed(t.Context(), fingerprint); err != nil {
+	if ok, err := s.Processed(t.Context(), fingerprint); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else if !ok {
 		t.Error("fingerprint should be processed")
 	}
 
-	if err := storage.Remove(t.Context(), fingerprint); err != nil {
+	if err := s.Remove(t.Context(), fingerprint); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if ok, err := storage.Exists(t.Context(), fingerprint); err != nil {
+	if ok, err := s.Processed(t.Context(), fingerprint); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	} else if ok {
-		t.Error("fingerprint should not exists")
+		t.Error("fingerprint should not be processed after removal")
+	}
+
+	if elected, err := s.Add(t.Context(), fingerprint); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	} else if !elected {
+		t.Error("Add after Remove should elect the fingerprint again")
+	}
+}
+
+// TestRedis_Add_leaseExpiry ensures the lease attached by Add releases the
+// fingerprint once it expires, so a crashed elected request cannot block it
+// forever.
+func TestRedis_Add_leaseExpiry(t *testing.T) {
+	lease := 200 * time.Millisecond
+
+	s := redigo.NewRedis(newRedisPool(t), storage.WithLeaseTTL(lease))
+	fingerprint := anicetus.Fingerprint("test")
+
+	if elected, err := s.Add(t.Context(), fingerprint); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	} else if !elected {
+		t.Fatal("first Add should elect the fingerprint")
+	}
+
+	if elected, err := s.Add(t.Context(), fingerprint); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	} else if elected {
+		t.Fatal("Add within the lease should not elect the fingerprint")
+	}
+
+	time.Sleep(2 * lease)
+
+	if elected, err := s.Add(t.Context(), fingerprint); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	} else if !elected {
+		t.Error("Add after the lease expired should elect the fingerprint again")
 	}
 }
