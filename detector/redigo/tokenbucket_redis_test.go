@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"slices"
 	"strconv"
 	"testing"
 	"time"
@@ -36,19 +35,22 @@ func TestTokenBucketRedis_IsThunderingHerd(t *testing.T) {
 		},
 	}, {
 		burst:    4,
-		interval: 500 * time.Millisecond,
+		interval: 2 * time.Second,
 		cycles:   6,
 		cycleSleep: func(cycle int) time.Duration {
-			if cycle == 6 {
-				// sleep longer to allow populating 1 token and avoid thundering herd
-				return 500 * time.Millisecond
+			if cycle == 5 {
+				// wait more than one refill period so a single token is restored,
+				// allowing cycle 6 through again
+				return 2100 * time.Millisecond
 			}
-			return 100 * time.Millisecond
+			// negligible refill while draining the bucket; the wide margin keeps
+			// the result independent of Redis round-trip latency
+			return 10 * time.Millisecond
 		},
 		want: func(cycle int) bool {
-			// this may fail if the I/O with Redis is too slow, as the filling rate
-			// will give a chance for cycle 5
-			return slices.Contains([]int{5, 6}, cycle)
+			// cycles 1-4 drain the bucket, cycle 5 finds it empty (thundering
+			// herd), and the refill wait lets cycle 6 through again
+			return cycle == 5
 		},
 	}}
 
