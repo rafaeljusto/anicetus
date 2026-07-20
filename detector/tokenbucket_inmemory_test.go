@@ -2,7 +2,6 @@ package detector_test
 
 import (
 	"fmt"
-	"slices"
 	"strconv"
 	"testing"
 	"time"
@@ -27,17 +26,21 @@ func TestTokenBucketInMemory_IsThunderingHerd(t *testing.T) {
 		},
 	}, {
 		burst:    4,
-		interval: 500 * time.Millisecond,
-		cycles:   7,
+		interval: 2 * time.Second,
+		cycles:   6,
 		cycleSleep: func(cycle int) time.Duration {
-			if cycle == 6 {
-				// sleep longer to allow populating 1 token and avoid thundering herd
-				return 500 * time.Millisecond
+			if cycle == 5 {
+				// wait more than one refill period so a single token is restored,
+				// allowing cycle 6 through again
+				return 2100 * time.Millisecond
 			}
-			return 100 * time.Millisecond
+			// negligible refill while draining the bucket
+			return 10 * time.Millisecond
 		},
 		want: func(cycle int) bool {
-			return slices.Contains([]int{5, 6}, cycle)
+			// cycles 1-4 drain the bucket, cycle 5 finds it empty (thundering
+			// herd), and the refill wait lets cycle 6 through again
+			return cycle == 5
 		},
 	}}
 
