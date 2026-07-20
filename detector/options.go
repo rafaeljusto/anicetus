@@ -102,3 +102,46 @@ func TokenBucketWithLimitersInterval(interval time.Duration) TokenBucketOption {
 		o.limitersInterval = interval
 	}
 }
+
+// SingleFlightOptions represents the options that can be used to configure a
+// single-flight strategy.
+type SingleFlightOptions struct {
+	Options
+
+	coolDownInterval time.Duration
+}
+
+// NewSingleFlightOptions creates a new SingleFlightOptions with default values.
+func NewSingleFlightOptions() *SingleFlightOptions {
+	return &SingleFlightOptions{
+		Options: *NewOptions(),
+
+		coolDownInterval: 5 * time.Minute,
+	}
+}
+
+// CoolDownInterval returns the cooldown interval for the SingleFlightOptions.
+func (o *SingleFlightOptions) CoolDownInterval() time.Duration {
+	return o.coolDownInterval
+}
+
+// SingleFlightOption is a helper function to configure the SingleFlightOptions.
+type SingleFlightOption func(*SingleFlightOptions)
+
+// SingleFlightWithBasicOption sets the basic options for the
+// SingleFlightOptions.
+func SingleFlightWithBasicOption(options ...Option) SingleFlightOption {
+	return func(o *SingleFlightOptions) {
+		for _, opt := range options {
+			opt(&o.Options)
+		}
+	}
+}
+
+// SingleFlightWithCoolDownInterval sets the cooldown interval for the
+// SingleFlightOptions.
+func SingleFlightWithCoolDownInterval(interval time.Duration) SingleFlightOption {
+	return func(o *SingleFlightOptions) {
+		o.coolDownInterval = interval
+	}
+}
