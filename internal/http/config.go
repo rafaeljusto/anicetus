@@ -30,6 +30,14 @@ type Config struct {
 		Timeout time.Duration
 		Address *url.URL
 	}
+	Wait struct {
+		// Timeout is how long a blocked request is held waiting for the elected
+		// request to finish before giving up. Zero means do not wait: reply
+		// immediately with 503 and a Retry-After header.
+		Timeout time.Duration
+		// PollInterval is how often the gatekeeper is re-checked while waiting.
+		PollInterval time.Duration
+	}
 }
 
 // ParseFromEnvs parses the configuration from environment variables.
@@ -129,6 +137,25 @@ func ParseFromEnvs() (*Config, error) {
 		errs = errors.Join(errs, fmt.Errorf("ANICETUS_BACKEND_ADDRESS is required"))
 	} else if config.Backend.Address, err = url.Parse(addressStr); err != nil {
 		errs = errors.Join(errs, fmt.Errorf("failed to parse ANICETUS_BACKEND_ADDRESS: %w", err))
+	}
+
+	// Zero disables waiting: blocked requests get an immediate 503 + Retry-After.
+	if waitTimeoutStr := os.Getenv("ANICETUS_WAIT_TIMEOUT"); waitTimeoutStr != "" {
+		config.Wait.Timeout, err = time.ParseDuration(waitTimeoutStr)
+		if err != nil {
+			errs = errors.Join(errs, fmt.Errorf("failed to parse ANICETUS_WAIT_TIMEOUT: %w", err))
+		}
+	}
+
+	config.Wait.PollInterval = 50 * time.Millisecond
+	if pollIntervalStr := os.Getenv("ANICETUS_WAIT_POLL_INTERVAL"); pollIntervalStr != "" {
+		config.Wait.PollInterval, err = time.ParseDuration(pollIntervalStr)
+		if err != nil {
+			errs = errors.Join(errs, fmt.Errorf("failed to parse ANICETUS_WAIT_POLL_INTERVAL: %w", err))
+		}
+	}
+	if config.Wait.Timeout > 0 && config.Wait.PollInterval <= 0 {
+		errs = errors.Join(errs, fmt.Errorf("ANICETUS_WAIT_POLL_INTERVAL must be greater than zero"))
 	}
 
 	if errs != nil {

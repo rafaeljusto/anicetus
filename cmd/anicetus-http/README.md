@@ -34,3 +34,5 @@ The following environment variables can be used to configure the server:
 | `ANICETUS_FINGERPRINT_HEADERS`          | HTTP headers that are part of the fingerprint |
 | `ANICETUS_LOG_LEVEL`                    | Log level                                     |
 | `ANICETUS_PORT`                         | HTTP port to listen                           |
+| `ANICETUS_WAIT_POLL_INTERVAL`           | Gatekeeper re-check interval while waiting    |
+| `ANICETUS_WAIT_TIMEOUT`                 | Time a blocked request is held (0 = no wait)  |
