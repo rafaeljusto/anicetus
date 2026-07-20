@@ -45,6 +45,13 @@ func NewSingleFlightInMemory(options ...SingleFlightOption) *SingleFlightInMemor
 	}
 }
 
+// Close stops the background goroutine used to expire the internal state. It is
+// safe to call more than once.
+func (s *SingleFlightInMemory) Close() error {
+	s.cooldowns.Stop()
+	return nil
+}
+
 // CoolDown will cool down the fingerprint.
 func (s *SingleFlightInMemory) CoolDown(_ context.Context, fingerprint anicetus.Fingerprint) error {
 	s.cooldowns.Set(fingerprint, true)

@@ -17,22 +17,28 @@ type Resources struct {
 	Logger        *slog.Logger
 	Anicetus      *anicetus.Anicetus[fingerprint.HTTPRequest]
 	BackendClient *http.Client
+
+	// detector is retained so its background goroutines can be stopped on Close.
+	detector *detector.TokenBucketInMemory
 }
 
 // NewResources creates a new set of resources for the web server.
 func NewResources(config *Config) *Resources {
+	tokenBucket := detector.NewTokenBucketInMemory(
+		detector.TokenBucketWithLimitersBurst(config.Detector.RequestsPerMinute),
+		detector.TokenBucketWithLimitersInterval(time.Minute),
+		detector.TokenBucketWithCoolDownInterval(config.Detector.CoolDown),
+	)
+
 	resources := &Resources{
 		Logger: slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 			Level: config.LoggerLevel,
 		})),
 		Anicetus: anicetus.NewAnicetus[fingerprint.HTTPRequest](
-			detector.NewTokenBucketInMemory(
-				detector.TokenBucketWithLimitersBurst(config.Detector.RequestsPerMinute),
-				detector.TokenBucketWithLimitersInterval(time.Minute),
-				detector.TokenBucketWithCoolDownInterval(config.Detector.CoolDown),
-			),
+			tokenBucket,
 			storage.NewInMemory(),
 		),
+		detector: tokenBucket,
 	}
 
 	resources.BackendClient = &http.Client{
@@ -40,4 +46,10 @@ func NewResources(config *Config) *Resources {
 	}
 
 	return resources
+}
+
+// Close releases the resources held by the web server, stopping the detector's
+// background goroutines.
+func (r *Resources) Close() error {
+	return r.detector.Close()
 }

@@ -11,7 +11,8 @@ type Map[K comparable, V any] struct {
 	itemsMutex      sync.RWMutex
 	expirationQueue *expirationQueue[K]
 
-	stop chan struct{}
+	stop     chan struct{}
+	stopOnce sync.Once
 }
 
 // New creates a new Map.
@@ -19,6 +20,7 @@ func New[K comparable, V any](ttl time.Duration) *Map[K, V] {
 	m := &Map[K, V]{
 		items:           make(map[K]V),
 		expirationQueue: newExpirationQueue[K](ttl),
+		stop:            make(chan struct{}),
 	}
 	m.start()
 	return m
@@ -73,7 +75,10 @@ func (m *Map[K, V]) start() {
 	}()
 }
 
-// Stop stops the map from expiring the keys.
+// Stop stops the background goroutine that expires the keys. It is safe to call
+// more than once.
 func (m *Map[K, V]) Stop() {
-	close(m.stop)
+	m.stopOnce.Do(func() {
+		close(m.stop)
+	})
 }

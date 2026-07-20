@@ -37,6 +37,14 @@ func NewTokenBucketInMemory(options ...TokenBucketOption) *TokenBucketInMemory {
 	}
 }
 
+// Close stops the background goroutines used to expire the internal state. It
+// is safe to call more than once.
+func (t *TokenBucketInMemory) Close() error {
+	t.cooldowns.Stop()
+	t.limiters.Stop()
+	return nil
+}
+
 // CoolDown will cool down the fingerprint.
 func (t *TokenBucketInMemory) CoolDown(_ context.Context, fingerprint anicetus.Fingerprint) error {
 	t.cooldowns.Set(fingerprint, true)

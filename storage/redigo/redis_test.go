@@ -26,6 +26,9 @@ func newRedisPool(t *testing.T) *redis.Pool {
 	}
 
 	redisPool := &redis.Pool{
+		MaxIdle:     10,
+		MaxActive:   100,
+		IdleTimeout: 5 * time.Minute,
 		DialContext: func(ctx context.Context) (redis.Conn, error) {
 			return redis.DialContext(ctx, "tcp", redisAddress)
 		},
@@ -101,7 +104,10 @@ func TestRedis_lifecycle(t *testing.T) {
 // fingerprint once it expires, so a crashed elected request cannot block it
 // forever.
 func TestRedis_Add_leaseExpiry(t *testing.T) {
-	lease := 200 * time.Millisecond
+	// The lease must comfortably exceed the round-trip of a couple of commands
+	// so the "within lease" Add reliably observes the key, while remaining short
+	// enough to keep the test fast once we wait it out.
+	lease := 2 * time.Second
 
 	s := redigo.NewRedis(newRedisPool(t), storage.WithLeaseTTL(lease))
 	fingerprint := anicetus.Fingerprint("test")
