@@ -33,7 +33,7 @@ func TestExpirationQueue_renewKeepsOrder(t *testing.T) {
 	}
 }
 
-func TestMap_StopIsIdempotent(t *testing.T) {
+func TestMap_StopIsIdempotent(*testing.T) {
 	m := New[string, int](time.Minute)
 
 	// Must not panic, even when called more than once.
