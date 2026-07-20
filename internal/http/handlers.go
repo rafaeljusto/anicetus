@@ -1,12 +1,19 @@
 package http
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/rafaeljusto/anicetus/v3"
 	"github.com/rafaeljusto/anicetus/v3/fingerprint"
 )
+
+// retryAfterSeconds is the Retry-After value sent to a blocked request that is
+// not served, telling the client how long to back off before retrying.
+const retryAfterSeconds = 1
 
 // RegisterHandlers registers the handlers for the web server.
 func RegisterHandlers(router *http.ServeMux, config *Config, resources *Resources) {
@@ -48,6 +55,13 @@ func anicetusHandler(config *Config, resources *Resources) http.HandlerFunc {
 			return
 		}
 
+		// When configured to wait, hold a blocked request until the elected
+		// request finishes (so it can be served from the warm cache) instead of
+		// rejecting it immediately.
+		if gatekeeperStatus == anicetus.StatusWait && config.Wait.Timeout > 0 {
+			gatekeeperStatus = waitForGate(r.Context(), config, resources, fingerprint, httpLogger)
+		}
+
 		switch gatekeeperStatus {
 		case anicetus.StatusFailed:
 			w.WriteHeader(http.StatusInternalServerError)
@@ -77,6 +91,9 @@ func anicetusHandler(config *Config, resources *Resources) http.HandlerFunc {
 			}
 
 		case anicetus.StatusWait:
+			// Either waiting is disabled or we waited out the timeout without the
+			// elected request finishing. Ask the client to retry.
+			w.Header().Set("Retry-After", strconv.Itoa(retryAfterSeconds))
 			w.WriteHeader(http.StatusServiceUnavailable)
 
 		case anicetus.StatusOpenGates:
@@ -88,6 +105,43 @@ func anicetusHandler(config *Config, resources *Resources) http.HandlerFunc {
 					slog.String("error", err.Error()),
 				)
 				w.WriteHeader(http.StatusInternalServerError)
+			}
+		}
+	}
+}
+
+// waitForGate blocks until the request is no longer waiting behind the elected
+// request -- either because that request finished (StatusOpenGates) or because
+// its lease expired and this request was elected instead (StatusProcess) -- or
+// until the configured wait timeout elapses. It returns the resolved status,
+// which is StatusWait when the timeout is reached.
+func waitForGate(
+	ctx context.Context,
+	config *Config,
+	resources *Resources,
+	f fingerprint.HTTPRequest,
+	logger *slog.Logger,
+) anicetus.Status {
+	ctx, cancel := context.WithTimeout(ctx, config.Wait.Timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(config.Wait.PollInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return anicetus.StatusWait
+		case <-ticker.C:
+			status, err := resources.Anicetus.Evaluate(ctx, f)
+			if err != nil {
+				logger.Error("failed to re-evaluate fingerprint while waiting",
+					slog.String("error", err.Error()),
+				)
+				return anicetus.StatusFailed
+			}
+			if status != anicetus.StatusWait {
+				return status
 			}
 		}
 	}
