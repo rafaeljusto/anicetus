@@ -70,3 +70,24 @@ func TestTokenBucketInMemory_IsThunderingHerd(t *testing.T) {
 		})
 	}
 }
+
+// TestTokenBucketInMemory_zeroConfig ensures a burst or cooldown of zero does
+// not panic when constructing the detector (the internal expiry maps would
+// otherwise start a ticker with a non-positive interval). Such a configuration
+// simply treats every request as a thundering herd.
+func TestTokenBucketInMemory_zeroConfig(t *testing.T) {
+	d := detector.NewTokenBucketInMemory(
+		detector.TokenBucketWithLimitersBurst(0),
+		detector.TokenBucketWithLimitersInterval(time.Minute),
+		detector.TokenBucketWithCoolDownInterval(0),
+	)
+	t.Cleanup(func() { _ = d.Close() })
+
+	herd, err := d.IsThunderingHerd(t.Context(), anicetus.Fingerprint("test"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !herd {
+		t.Error("expected a burst of zero to always report a thundering herd")
+	}
+}

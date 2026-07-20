@@ -15,14 +15,19 @@ type Map[K comparable, V any] struct {
 	stopOnce sync.Once
 }
 
-// New creates a new Map.
+// New creates a new Map. A non-positive ttl disables expiration: entries are
+// kept until explicitly deleted and no background goroutine is started. This
+// also avoids panicking on time.NewTicker, which rejects non-positive
+// intervals.
 func New[K comparable, V any](ttl time.Duration) *Map[K, V] {
 	m := &Map[K, V]{
 		items:           make(map[K]V),
 		expirationQueue: newExpirationQueue[K](ttl),
 		stop:            make(chan struct{}),
 	}
-	m.start()
+	if ttl > 0 {
+		m.start()
+	}
 	return m
 }
 

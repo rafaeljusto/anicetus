@@ -40,3 +40,19 @@ func TestMap_StopIsIdempotent(*testing.T) {
 	m.Stop()
 	m.Stop()
 }
+
+// TestMap_NonPositiveTTL guards against time.NewTicker panicking on a
+// non-positive interval: a non-positive ttl must disable expiration rather than
+// crash. Entries are kept and Stop stays safe.
+func TestMap_NonPositiveTTL(t *testing.T) {
+	for _, ttl := range []time.Duration{0, -time.Second} {
+		m := New[string, int](ttl)
+
+		m.Set("key", 1)
+		if value, ok := m.Get("key"); !ok || value != 1 {
+			t.Errorf("ttl %s: expected key to be kept, got value %d ok %t", ttl, value, ok)
+		}
+
+		m.Stop()
+	}
+}
