@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/rafaeljusto/anicetus/v2"
-	"github.com/rafaeljusto/anicetus/v2/storage"
-	"github.com/rafaeljusto/anicetus/v2/storage/redigo"
+	"github.com/rafaeljusto/anicetus/v3"
+	"github.com/rafaeljusto/anicetus/v3/storage"
+	"github.com/rafaeljusto/anicetus/v3/storage/redigo"
 )
 
 const defaultRedisAddress = "localhost:6379"

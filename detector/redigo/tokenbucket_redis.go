@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/rafaeljusto/anicetus/v2"
-	"github.com/rafaeljusto/anicetus/v2/detector"
+	"github.com/rafaeljusto/anicetus/v3"
+	"github.com/rafaeljusto/anicetus/v3/detector"
 )
 
 var (

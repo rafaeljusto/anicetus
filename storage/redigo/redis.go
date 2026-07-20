@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/rafaeljusto/anicetus/v2"
-	"github.com/rafaeljusto/anicetus/v2/storage"
+	"github.com/rafaeljusto/anicetus/v3"
+	"github.com/rafaeljusto/anicetus/v3/storage"
 )
 
 var _ anicetus.GatekeeperStorage = &Redis{}

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rafaeljusto/anicetus/v2/fingerprint"
+	"github.com/rafaeljusto/anicetus/v3/fingerprint"
 )
 
 // Config stores the configuration for the application.

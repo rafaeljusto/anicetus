@@ -3,8 +3,8 @@ package detector
 import (
 	"context"
 
-	"github.com/rafaeljusto/anicetus/v2"
-	"github.com/rafaeljusto/anicetus/v2/internal/mapexp"
+	"github.com/rafaeljusto/anicetus/v3"
+	"github.com/rafaeljusto/anicetus/v3/internal/mapexp"
 )
 
 var _ anicetus.Detector = &SingleFlightInMemory{}

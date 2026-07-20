@@ -8,9 +8,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/rafaeljusto/anicetus/v2"
-	"github.com/rafaeljusto/anicetus/v2/detector"
-	"github.com/rafaeljusto/anicetus/v2/storage"
+	"github.com/rafaeljusto/anicetus/v3"
+	"github.com/rafaeljusto/anicetus/v3/detector"
+	"github.com/rafaeljusto/anicetus/v3/storage"
 )
 
 // Request represents an incoming request.

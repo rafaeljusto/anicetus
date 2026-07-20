@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/rafaeljusto/anicetus/v2"
+	"github.com/rafaeljusto/anicetus/v3"
 )
 
 type forwardRequestOptions struct {
