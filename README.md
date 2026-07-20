@@ -19,6 +19,48 @@ an existing solution.
 
 [![Anicetus Video](https://img.youtube.com/vi/vInKlTQMKBc/0.jpg)](https://www.youtube.com/watch?v=vInKlTQMKBc)
 
+## When (not) to use this
+
+The thundering herd is a real problem, but a lot of stacks already solve it
+somewhere else. Before reaching for Anicetus, check whether one of these already
+covers you:
+
+| Alternative | How it handles the herd | When it's the better fit |
+|---|---|---|
+| **CDN origin shielding / request collapsing** (Cloudflare, Fastly, CloudFront) | Collapses concurrent cache misses at the edge, transparently | You already front cacheable `GET`s with a CDN — this is free and needs no code |
+| **In-process single-flight** ([`golang.org/x/sync/singleflight`](https://pkg.go.dev/golang.org/x/sync/singleflight), `groupcache`) | Deduplicates identical in-flight calls inside one process | A single service instance, or per-instance dedup is enough |
+| **`stale-while-revalidate`** (HTTP caching / CDNs) | Serves stale content while one request refreshes in the background | The response can be briefly stale and you control the cache headers |
+| **Probabilistic early expiration** (XFetch) | Recomputes a hot key *before* it expires, spreading the load out | You own the cache layer and can add jitter to TTLs |
+
+**Anicetus fits the gap those leave:** coordinating a single request through to
+the backend *across processes*, in front of a backend you can't easily change,
+without a CDN doing it for you. Concretely, it earns its place when:
+
+- The backend has **no CDN** in front (internal services, B2B APIs, DB-backed
+  endpoints, gRPC-ish internal traffic).
+- You run **multiple instances** and need cross-instance coalescing that
+  in-process `singleflight` can't give you (use the Redis detector and storage).
+- The expensive operation is **cacheable and dramatically more expensive** than
+  the coordination overhead (heavy aggregations, rate-limited third-party calls,
+  ML inference).
+
+**It won't help — or will actively hurt — when:**
+
+- The response **isn't cacheable** (personalized, per-user, or a write). Blocking
+  then releasing only time-shifts the herd; it doesn't remove it.
+- The **fingerprint can't be aligned with the backend's cache key** (auth,
+  cookies, `Vary` headers, query normalization). A mismatch either over-coalesces
+  unrelated requests or lets the herd leak anyway.
+- Traffic is **low enough that a stampede never forms** — you'd be paying
+  detector/gatekeeper overhead on every request for a problem you don't have.
+
+> [!NOTE]
+> The default token bucket detector is a *threshold* strategy: it only engages
+> once concurrent traffic for a fingerprint exceeds the configured burst, so the
+> first burst reaches the backend by design. If you want to guarantee that no
+> more than one request per fingerprint hits the backend — even a herd of two —
+> use the single-flight detector instead (see below).
+
 ## Design
 
 ```mermaid
@@ -72,6 +114,18 @@ bucket](https://en.wikipedia.org/wiki/Token_bucket) out-of-the-box (with a
 penalty strategy; bucket is drained while in thundering herd). When using the
 token bucket algorithm the detector needs to know how many same fingerprint
 occurences are allowed in a time window.
+
+Alternatively, the library provides a **single-flight** detector
+(`NewSingleFlightInMemory`, or the Redis-backed storage for the distributed
+case). It has no burst threshold: it treats a fingerprint as a thundering herd
+from the very first duplicate, so the gatekeeper lets exactly one request reach
+the backend and blocks every concurrent request with the same fingerprint. This
+is the deterministic equivalent of
+[`golang.org/x/sync/singleflight`](https://pkg.go.dev/golang.org/x/sync/singleflight),
+but coordinated through the gatekeeper storage so it works across processes.
+Prefer it when a burst of concurrent requests reaching the backend is *not*
+acceptable; prefer the token bucket when it is and you only want to engage above
+a threshold.
 
 After the thundering herd is handled, the detector will stop analysing the
 requests for a while (cooldown period). This is to avoid the thundering herd to
