@@ -21,12 +21,16 @@ func anicetusHandler(config *Config, resources *Resources) http.HandlerFunc {
 		)
 
 		if r.Method != http.MethodGet {
+			// Only GET requests are subject to thundering herd control; anything
+			// else is forwarded straight to the backend. Return afterwards so the
+			// request is not evaluated and forwarded a second time.
 			if err := forwardRequest(w, r, config, resources); err != nil {
 				httpLogger.Error("failed to forward request",
 					slog.String("error", err.Error()),
 				)
 				w.WriteHeader(http.StatusInternalServerError)
 			}
+			return
 		}
 
 		fingerprint := fingerprint.NewHTTPRequest(r,

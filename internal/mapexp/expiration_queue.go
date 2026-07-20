@@ -45,7 +45,15 @@ func (e *expirationQueue[K]) renew(key K) {
 
 	for i, item := range e.items {
 		if item.key == key {
-			e.items[i].expiration = time.Now().Add(e.ttl)
+			// Move the item to the back with a fresh expiration. purge relies on
+			// the queue staying ordered by ascending expiration; updating the
+			// expiration in place would leave a longer-lived item ahead of
+			// shorter-lived ones and make purge stop scanning too early.
+			e.items = append(e.items[:i], e.items[i+1:]...)
+			e.items = append(e.items, expirationQueueItem[K]{
+				key:        key,
+				expiration: time.Now().Add(e.ttl),
+			})
 			break
 		}
 	}

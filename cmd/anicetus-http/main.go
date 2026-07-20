@@ -79,6 +79,11 @@ func main() {
 			slog.String("error", err.Error()),
 		)
 	}
+	if err := resources.Close(); err != nil {
+		resources.Logger.Error("failed to release resources",
+			slog.String("error", err.Error()),
+		)
+	}
 	resources.Logger.Info("server stopped")
 }
 
