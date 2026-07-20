@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rafaeljusto/anicetus/v2"
-	"github.com/rafaeljusto/anicetus/v2/detector"
+	"github.com/rafaeljusto/anicetus/v3"
+	"github.com/rafaeljusto/anicetus/v3/detector"
 )
 
 func TestSingleFlightInMemory_IsThunderingHerd(t *testing.T) {

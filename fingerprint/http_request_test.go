@@ -9,8 +9,8 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/rafaeljusto/anicetus/v2"
-	"github.com/rafaeljusto/anicetus/v2/fingerprint"
+	"github.com/rafaeljusto/anicetus/v3"
+	"github.com/rafaeljusto/anicetus/v3/fingerprint"
 )
 
 func TestHTTPRequest_Fingerprint(t *testing.T) {

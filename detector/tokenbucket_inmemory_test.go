@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rafaeljusto/anicetus/v2"
-	"github.com/rafaeljusto/anicetus/v2/detector"
+	"github.com/rafaeljusto/anicetus/v3"
+	"github.com/rafaeljusto/anicetus/v3/detector"
 )
 
 func TestTokenBucketInMemory_IsThunderingHerd(t *testing.T) {

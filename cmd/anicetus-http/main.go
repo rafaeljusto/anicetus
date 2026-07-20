@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	anicetushttp "github.com/rafaeljusto/anicetus/v2/internal/http"
+	anicetushttp "github.com/rafaeljusto/anicetus/v3/internal/http"
 )
 
 func main() {

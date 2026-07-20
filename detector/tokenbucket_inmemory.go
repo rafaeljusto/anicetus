@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/rafaeljusto/anicetus/v2"
-	"github.com/rafaeljusto/anicetus/v2/internal/mapexp"
-	"github.com/rafaeljusto/anicetus/v2/internal/rate"
+	"github.com/rafaeljusto/anicetus/v3"
+	"github.com/rafaeljusto/anicetus/v3/internal/mapexp"
+	"github.com/rafaeljusto/anicetus/v3/internal/rate"
 )
 
 var _ anicetus.Detector = &TokenBucketInMemory{}

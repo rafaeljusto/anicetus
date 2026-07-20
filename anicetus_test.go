@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/rafaeljusto/anicetus/v2"
+	"github.com/rafaeljusto/anicetus/v3"
 )
 
 func TestAnicetus_Evaluate(t *testing.T) {
